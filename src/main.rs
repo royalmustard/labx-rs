@@ -21,17 +21,24 @@ struct Messung
 struct Datenreihe
 {
     #[serde(rename="values")]
-    werte: Option<Vec<f64>>,
-    #[serde(rename="quantity")]
-    groesse: String,
+    werte: Vec<Value>,
+    #[serde(rename="$value")]
+    quantity: String,
+    #[serde(rename="$value")]
     symbol: String,
-    #[serde(rename="unit")]
-    einheit: String
+    #[serde(rename="$value")]
+    unit: String
 }
-
+#[derive(Deserialize, Debug)]
+struct Value
+{
+    #[serde(rename="$value")]
+    wert: f64
+}
 #[derive(Deserialize, Debug, Serialize)]
 struct channel
 {
+
     quantity: String,
     symbol: String,
     unit: String,
@@ -39,10 +46,10 @@ struct channel
 }
 fn main(){
     let cassy_daten = CassyDaten{messungen: Vec::new()};
-    let file = std::fs::read_to_string("data_fat.xml").unwrap();
-    let mut reader = Reader::from_str(&file);
-    let mut buf:Vec<u8> = Vec::new();
-    // loop {
+    // let file = std::fs::read_to_string("data_fat.xml").unwrap();
+    // let mut reader = Reader::from_str(&file);
+    // let mut buf:Vec<u8> = Vec::new();
+    // // loop {
     //     match reader.read_event_into(&mut buf) {
     //         Ok(Event::Start(e)) if e.name().as_ref() == b"channel" => {
     //             if let Ok(Some(_)) = e.try_get_attribute("datetime")
@@ -59,7 +66,8 @@ fn main(){
     //     }
     // }
 
-    let test = r#"<?xml version="1.0" encoding="UTF-8"?><channel><quantity>Index</quantity><symbol>n</symbol><unit /><range min="0" max="100001" /><values count="100001"><value>1</value></values></channel>"#;
-    let owo: channel = serde_xml_rs::from_str(test).unwrap();//channel { quantity: "owo".to_string(), symbol: "sus".to_string(), unit: "bus".to_string(), values: vec![420.69f64] };
+    let test = r##"<channel><quantity>Index</quantity><symbol>n</symbol><unit /><range min="0" max="100001" /><values count="100001"></values></channel>"##;
+    println!("{}", test);
+    let owo: Datenreihe = serde_xml_rs::from_str(test).unwrap();//channel { quantity: "owo".to_string(), symbol: "sus".to_string(), unit: "bus".to_string(), values: vec![420.69f64] };
     //println!("{}", serde_xml_rs::to_string(&owo).unwrap());
 }
