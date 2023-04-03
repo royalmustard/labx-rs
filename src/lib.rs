@@ -1,5 +1,7 @@
-use std::fmt::Display;
-use std::fs::read;
+use pyo3::prelude::*;
+ 
+
+
 use std::path::Path;
 use std::{collections::HashMap, io::Read};
 
@@ -8,11 +10,13 @@ use quick_xml::reader::Reader;
 
 
 #[derive(Debug)]
+#[pyclass]
 struct CassyDaten {
     messungen: Vec<Messung>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+#[pyclass]
 struct Messung {
     zeitpunkt: String,
     beschreibung: String,
@@ -20,11 +24,31 @@ struct Messung {
 }
 
 #[derive(Debug, Clone)]
+#[pyclass]
 struct Datenreihe {
     quantity: String,
     symbol: String,
     unit: String,
+    #[pyo3(get)]
     values: Vec<f64>,
+}
+
+#[pymethods]
+impl CassyDaten
+{
+    fn messung(&self, number: usize) -> Messung
+    {
+        self.messungen.get(number).unwrap().clone()
+    }
+}
+
+#[pymethods]
+impl Messung
+{
+    fn datenreihe(&self, symbol: String) -> Datenreihe
+    {
+        self.datenreihen.iter().filter(|d| d.symbol == symbol).cloned().collect::<Vec<Datenreihe>>().get(0).unwrap().to_owned()
+    }
 }
 
 // impl Display for Vec<f64>
@@ -34,17 +58,20 @@ struct Datenreihe {
 //         write!(f, "{}", out)
 //     }
 // }
-fn main() {
-    let mut cassy_daten = CassyDaten {
-        messungen: Vec::new(),
-    };
+#[pyfunction]
+fn read_labx(filename: String) -> CassyDaten {
 
-
-    let file = std::fs::File::open(Path::new("owo.labx")).expect("Error opening file!");
+    let file = std::fs::File::open(Path::new(&filename)).expect("Error opening file!");
     let mut buf = String::new();
     zip::ZipArchive::new(file).expect("Error parsing zipfile!").by_name("data.xml").expect("data.xml not found in zipfile").read_to_string(&mut buf).expect("Error reading data.xml to buffer");
     let mut reader = Reader::from_str(&buf);
 
+    
+
+
+    let mut cassy_daten = CassyDaten {
+        messungen: Vec::new(),
+    };
     let mut buf: Vec<u8> = Vec::new();
     let mut unit_indices: HashMap<String, usize> = HashMap::new();
     let mut current_symbol: String = "".to_string();
@@ -98,5 +125,16 @@ fn main() {
             _ => (), // There are several other `Event`s we do not consider here
         }
     }
+    return cassy_daten;
     //println!("{:?}", cassy_daten)
+}
+
+#[pymodule]
+fn labx(_py: Python<'_>, m: &PyModule) -> PyResult<()>
+{
+    m.add_class::<CassyDaten>()?;
+    m.add_class::<Messung>()?;
+    m.add_class::<Datenreihe>()?;
+    m.add_function(wrap_pyfunction!(read_labx, m)?)?;
+    Ok(())
 }
