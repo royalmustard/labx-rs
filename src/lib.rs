@@ -26,8 +26,11 @@ struct Messung {
 #[derive(Debug, Clone)]
 #[pyclass]
 struct Datenreihe {
+    #[pyo3(get)]
     quantity: String,
+    #[pyo3(get)]
     symbol: String,
+    #[pyo3(get)]
     unit: String,
     #[pyo3(get)]
     values: Vec<f64>,
@@ -38,7 +41,7 @@ impl CassyDaten
 {
     fn messung(&self, number: usize) -> Messung
     {
-        self.messungen.get(number).unwrap().clone()
+        self.messungen.get(number-1).unwrap().clone()
     }
 }
 
@@ -48,6 +51,11 @@ impl Messung
     fn datenreihe(&self, symbol: String) -> Datenreihe
     {
         self.datenreihen.iter().filter(|d| d.symbol == symbol).cloned().collect::<Vec<Datenreihe>>().get(0).unwrap().to_owned()
+    }
+
+    fn info(&self)
+    {
+        println!("{:?}", self.datenreihen.iter().map(|d| d.symbol.clone()).collect::<Vec<String>>());
     }
 }
 
@@ -81,6 +89,13 @@ fn read_labx(filename: String) -> CassyDaten {
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) if e.name().as_ref() == b"channel" => {
+                if !datenreihe_vec.is_empty()
+                {
+                    datenreihe.values = datenreihe_vec.clone();
+                    cassy_daten.messungen.get_mut(*unit_indices.get(&current_symbol).unwrap()).unwrap().datenreihen.push(datenreihe.clone());
+                    //println!("{:?}", datenreihe);
+                    datenreihe_vec.clear();
+                }
                 if let Ok(Some(_)) = e.try_get_attribute("datetime") 
                 {
                     //Erstelle Neue Messung
@@ -90,17 +105,7 @@ fn read_labx(filename: String) -> CassyDaten {
                     cassy_daten.messungen.push(messung);
 
                 }
-                else 
-                {
-                    
-                }
-                if !datenreihe_vec.is_empty()
-                {
-                    datenreihe.values = datenreihe_vec.clone();
-                    cassy_daten.messungen.get_mut(*unit_indices.get(&current_symbol).unwrap()).unwrap().datenreihen.push(datenreihe.clone());
-                    //println!("{:?}", datenreihe);
-                    datenreihe_vec.clear();
-                }
+                
             }
             Ok(Event::Start(e)) if e.name().as_ref() == b"quantity" =>
             {
@@ -120,7 +125,16 @@ fn read_labx(filename: String) -> CassyDaten {
             Ok(Event::Start(e)) if e.name().as_ref() == b"value" => {
                 datenreihe_vec.push( fast_float::parse(reader.read_text(e.name()).unwrap().as_ref()).unwrap());
             }
-            Ok(Event::Eof) => break, // exits the loop when reaching end of file
+            Ok(Event::Eof) => {
+                if !datenreihe_vec.is_empty()
+                {
+                    datenreihe.values = datenreihe_vec.clone();
+                    cassy_daten.messungen.get_mut(*unit_indices.get(&current_symbol).unwrap()).unwrap().datenreihen.push(datenreihe.clone());
+                    //println!("{:?}", datenreihe);
+                    datenreihe_vec.clear();
+                }
+                break
+            }, // exits the loop when reaching end of file
             Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
             _ => (), // There are several other `Event`s we do not consider here
         }
